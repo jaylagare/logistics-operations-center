@@ -1,0 +1,93 @@
+{
+  "_note": "Scripted replay of the exception agent's turns (text + tool calls). Tools, policy and ETAs are computed live by the app on every run. Replace this file with a recorded live run: npm run scenario -- --record",
+  "initial": [
+    {
+      "text": "Closure north of Albury. First: what do the reports say, which loads are exposed, and what relief capacity do we have?",
+      "calls": [
+        { "name": "get_disruption_reports", "input": {} },
+        { "name": "get_affected_loads", "input": {} },
+        { "name": "find_relief_drivers", "input": {} }
+      ]
+    },
+    {
+      "text": "Closure estimate. The reports conflict: the road authority says 'until further notice', police on site say 3–4h, and creek levels peak around 02:00 (4h20m from now). Floodwater roads usually reopen after the peak plus an inspection, so I'm planning on 5h, low confidence. Wodonga has only 2 relief drivers (D-M3 can't be there before 01:10), and 4 loads are affected. D-A1 on the perishable load has just 2.0h left, and the DG load can't use the Olympic detour. Evaluating each load under the 5h assumption.",
+      "calls": [
+        { "name": "evaluate_options", "input": { "load_id": "L-1042", "reopen_hours": 5, "relief_driver_id": "D-W1" } },
+        { "name": "evaluate_options", "input": { "load_id": "L-1038", "reopen_hours": 5, "relief_driver_id": "D-W2" } },
+        { "name": "evaluate_options", "input": { "load_id": "L-1051", "reopen_hours": 5 } },
+        { "name": "evaluate_options", "input": { "load_id": "L-1060", "reopen_hours": 5 } }
+      ]
+    },
+    {
+      "text": "Allocation. Only the Olympic detour with a fresh driver gets L-1042 (A$9,000 write-off at 06:00) and L-1038 (A$2,500 penalty at 06:00) in on time: 05:13 and 04:55. Waiting for the Hume misses both windows if the closure lasts 5h. So both Wodonga relief drivers go to those two. L-1051 is DG: Olympic is banned, so hold at Wodonga and rest the driver 7h; it leaves at 04:40 and arrives 09:52 against a 10:00 window, which only slips if the closure runs past 04:40 (7h). L-1060 has a flexible 14:00 window: rest at Wodonga, no relief driver needed. Expected cost of this plan: A$0 if the Hume reopens within ~5h.",
+      "calls": [
+        {
+          "name": "submit_plan",
+          "input": {
+            "reopen_hours": 5,
+            "confidence": "low",
+            "rationale": "Reports conflict (authority: until further notice; police: 3–4h; creek peak 02:00), so I planned on a 5h closure. Both Wodonga relief drivers go to the two loads with costed 06:00 windows (perishable A$9,000, retail penalty A$2,500) via the Olympic detour. The DG load can't use Olympic, so it holds at Wodonga; 09:52 vs 10:00 is tight and slips if the closure runs past 04:40. The flexible load rests at Wodonga.",
+            "items": [
+              { "load_id": "L-1042", "action": "swap_driver_olympic", "relief_driver_id": "D-W1" },
+              { "load_id": "L-1038", "action": "swap_driver_olympic", "relief_driver_id": "D-W2" },
+              { "load_id": "L-1051", "action": "rest_at_hub_then_hume" },
+              { "load_id": "L-1060", "action": "rest_at_hub_then_hume" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "Two holds executed under policy; the two driver swaps are with the dispatcher. Notifying the customer whose window is at risk.",
+      "calls": [
+        {
+          "name": "draft_notification",
+          "input": {
+            "load_id": "L-1051",
+            "to": "PetroSupply receiving",
+            "message": "The Hume is closed by flooding north of Albury and your load can't take the detour. It's holding safely at our Wodonga hub and is planned to arrive about 09:50, just inside your 10:00 window. If the road is still closed at about 04:30 we'll call you to rebook."
+          }
+        }
+      ]
+    }
+  ],
+  "replan": [
+    {
+      "text": "D-W2 is gone, so L-1038 has no driver. Who else could take it, and is it worth moving D-W1 off the perishable load?",
+      "calls": [
+        { "name": "find_relief_drivers", "input": {} },
+        { "name": "evaluate_options", "input": { "load_id": "L-1038", "reopen_hours": 5, "relief_driver_id": "D-M3" } },
+        { "name": "evaluate_options", "input": { "load_id": "L-1042", "reopen_hours": 5, "relief_driver_id": "D-M3" } }
+      ]
+    },
+    {
+      "text": "L-1038 will be late whatever we do: D-M3 can't reach Wodonga before 01:35. Swapping D-W1 onto L-1038 would save the A$2,500 penalty but put L-1042 late, a A$9,000 write-off, so D-W1 stays on the perishable load. For L-1038 with D-M3: Hume 08:17 only if the road reopens by ~03:05; Olympic 08:44 doesn't depend on the flood. Same penalty either way, and confidence in the reopening is low, so I'm taking the certain ETA.",
+      "calls": [
+        {
+          "name": "submit_plan",
+          "input": {
+            "reopen_hours": 5,
+            "confidence": "low",
+            "rationale": "D-W2 dropped out. Moving D-W1 to this load would trade a A$2,500 penalty for a A$9,000 perishable write-off, so D-W1 stays. D-M3 drives up from Melbourne (at Wodonga 01:35) and takes L-1038 via the Olympic Hwy: 08:44, late, A$2,500 penalty. The Hume option (08:17) depends on the road reopening by ~03:05, which is low confidence.",
+            "items": [
+              { "load_id": "L-1038", "action": "swap_driver_olympic", "relief_driver_id": "D-M3" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "Telling Northline now rather than at 06:00.",
+      "calls": [
+        {
+          "name": "draft_notification",
+          "input": {
+            "load_id": "L-1038",
+            "to": "Northline Retail store ops",
+            "message": "Flooding has closed the Hume near Albury. Your replenishment load will arrive about 08:45 instead of before 06:00, with a fresh driver via the inland route. Sorry for the delay; please let us know if you need a different unloading slot."
+          }
+        }
+      ]
+    }
+  ]
+}
